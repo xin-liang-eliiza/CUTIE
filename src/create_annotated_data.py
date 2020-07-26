@@ -29,8 +29,8 @@ def annotate_data(file_ids):
             text_boxes = format_text_boxes(blocks, im.width, im.height)
             global_attr = get_global_attribute(fid)
 
-            input_data = generate_input_data(text_boxes, [], global_attr)
-            write_json_to_s3(input_data, transform_bucket, anno_text_key_prefix.format(fid))
+            input_data = generate_input_data([t._asdict() for t in text_boxes], [], global_attr._asdict())
+            write_json_to_s3(input_data._asdict(), transform_bucket, anno_text_key_prefix.format(fid))
 
             # Generate annotated image data
             im = display_image_from_s3(im_bucket, i_key, text_boxes, displayed=False)
