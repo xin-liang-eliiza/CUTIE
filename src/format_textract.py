@@ -1,12 +1,12 @@
 from typing import List, Dict
 import json
-from collection import namedtuple
+from collections import namedtuple
 
 
-TextractBlock = namedtuple("TextractBlock", ["BlockType", "Confidence", "Text", "Geometry", "Polygon"]
+TextractBlock = namedtuple("TextractBlock", ["BlockType", "Confidence", "Text", "BoundingBox", "Polygon"])
 
 
-def get_textract_blocks_by_type(json_data: Dict, bl_type: str = "WORD") -> List[|TextractBlock]:
+def get_textract_blocks_by_type(json_data: Dict, bl_type: str = "WORD") -> List[TextractBlock]:
     blocks = json_data.get("Blocks", [])
     outputs = []
     for bl in blocks:
@@ -16,8 +16,8 @@ def get_textract_blocks_by_type(json_data: Dict, bl_type: str = "WORD") -> List[
             bl["BlockType"],
             bl["Confidence"],
             bl["Text"],
-            bl["Geometry"],
-            bl["Polygon"]))
+            bl["Geometry"]["BoundingBox"],
+            bl["Geometry"]["Polygon"]))
     
     return outputs
 
