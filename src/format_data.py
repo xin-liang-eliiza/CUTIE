@@ -9,7 +9,7 @@ FieldLabel = namedtuple("FieldLabel", ["field_name", "value_id", "value_text", "
 
 GlobalAttribute = namedtuple("GlobalAttribute", ["file_id"])
 
-InputJson = namedtuple("InputJson", ["text_boxes", "fields", "global_attributes"])
+InputData = namedtuple("InputData", ["text_boxes", "fields", "global_attributes"])
 
 
 label_classes = ["ServiceDate", "ProviderNum", "ProviderName", "ItemNum", "ItemCharge", "TotalCharge", "CustomerName", "ToothId"]
@@ -24,6 +24,14 @@ def format_text_boxes(blocks: TextractBlock, image_w:int, image_h:int) -> List[T
         boxes.append(TextBox(ind, bbox, bl.Text))
     return boxes
         
+
+def get_global_attribute(file_id):
+    return GlobalAttribute(file_id)
+
+
+def generate_input_data(text_boxes, fields, global_attributes):
+    return InputData(text_boxes, fields, global_attributes)
+
 
 
 
