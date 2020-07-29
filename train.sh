@@ -1,0 +1,42 @@
+#! /bin/bash
+
+
+python3 main_train_json.py \
+	--doc_path 'invoice_data/' \
+	--save_prefix 'INVOICE' \
+	--test_path '' \
+	--embedding_file '' \
+	--ckpt_path 'graph/' \
+	--tokenize True \
+	--update_dict True \
+	--dict_path 'dict/' \
+	--rows_segment 72 \
+	--cols_segment 72 \
+	--augment_strategy 1 \
+	--positional_mapping_strategy 1 \
+	--rows_target 64 \
+	--cols_target 64 \
+	--rows_ulimit 80 \
+	--fill_bbox False \
+	--data_augmentation_extra True \
+	--data_augmentation_dropout 1 \
+	--data_augmentation_extra_rows 16 \
+	--data_augmentation_extra_cols 16 \
+	--batch_size 2 \
+	--iterations 50 \
+	--lr_decay_step 13000 \
+	--learning_rate 0.0001 \
+	--lr_decay_factor 0.1 \
+	--hard_negative_ratio 3 \
+	--use_ghm 0 \
+	--ghm_bins 30 \
+	--ghm_momentum 0 \
+	--log_path 'log/' \
+	--log_disp_step 100 \
+	--log_save_step 100 \
+	--validation_step 10 \
+	--test_step 400 \
+	--ckpt_save_step 1 \
+	--embedding_size 128 \
+	--weight_decay 0.0005 \
+	--eps 1e-6

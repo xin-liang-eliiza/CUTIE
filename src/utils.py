@@ -13,11 +13,13 @@ import boto3
 s3 = boto3.resource('s3')
 
 
-def display_image_from_s3(bucket: str, key: str, boxes: List = [], displayed=False):
+def read_image_from_s3(bucket: str, key: str, boxes: List = [], displayed=False, to_file=True):
     font = ImageFont.truetype("./Hack-v3.003-ttf/ttf/Hack-Regular.ttf", 20)
 
     obj = s3.Bucket(bucket).Object(key)
     im = Image.open(obj.get()['Body'])
+    im_file = key.rpartition('/')[-1]
+    im.save("../invoice_data/{}".format(im_file))
     if boxes:
         draw = ImageDraw.Draw(im)
         for b in boxes:
