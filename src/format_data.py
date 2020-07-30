@@ -12,7 +12,7 @@ GlobalAttribute = namedtuple("GlobalAttribute", ["file_id"])
 InputData = namedtuple("InputData", ["text_boxes", "fields", "global_attributes"])
 
 
-label_classes = ["ServiceDate", "ProviderNum", "ProviderName", "ItemNum", "ItemCharge", "TotalCharge", "PatientName", "ToothId"]
+label_classes = ["ServiceDate", "ProviderNum", "ItemNum", "ItemCharge", "ToothId"]
 
 
 def format_text_boxes(blocks: TextractBlock, image_w:int, image_h:int) -> List[TextBox]:

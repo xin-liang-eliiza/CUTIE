@@ -1,10 +1,13 @@
 import os
 import json
 from typing import Dict, List
+from fuzzywuzzy import fuzz
+import dateparser
 
 from PIL import Image, ImageDraw, ImageFont
-from io import BytesIO
+from io import BytesIO, StringIO
 import numpy as np
+import pandas as pd
 from IPython.display import display
 
 import boto3
@@ -30,17 +33,6 @@ def read_image_from_s3(bucket: str, key: str, boxes: List = [], displayed=False,
     return im
 
 
-def read_json_from_s3(bucket: str, key: str) -> Dict:
-    obj = s3.Bucket(bucket).Object(key)
-    json_data = json.loads(obj.get()['Body'].read().decode('utf-8'))
-    return json_data
-
-
-def write_json_to_s3(json_data, bucket: str, key: str):
-    obj = s3.Bucket(bucket).Object(key)
-    obj.put(Body=json.dumps(json_data, indent=4), ServerSideEncryption="AES256")
-
-
 def write_image_to_s3(pil_img, bucket: str, key: str):
      out_img = BytesIO()
      pil_img.save(out_img, format="png")
@@ -53,9 +45,49 @@ def write_image_to_s3(pil_img, bucket: str, key: str):
      )
 
 
+def read_json_from_s3(bucket: str, key: str) -> Dict:
+    obj = s3.Bucket(bucket).Object(key)
+    json_data = json.loads(obj.get()['Body'].read().decode('utf-8'))
+    return json_data
+
+
+def write_json_to_s3(json_data, bucket: str, key: str):
+    obj = s3.Bucket(bucket).Object(key)
+    obj.put(Body=json.dumps(json_data, indent=4), ServerSideEncryption="AES256")
+
+
+def read_csv_from_s3(bucket: str, key: str):
+    obj = s3.Bucket(bucket).Object(key)
+    csv = obj.get()['Body'].read().decode('utf-8')
+    df = pd.read_csv(StringIO(csv))
+    return df
+
+
 def list_s3_keys(bucket: str, prefix: str) -> List:
     s3_client = boto3.client('s3')
     response = s3_client.list_objects_v2(Bucket=bucket, Prefix=prefix)
     keys = [i["Key"] for i in response.get("Contents", [])]
     return keys
+
+
+def is_text_matched(text_1, text_2):
+    r = fuzz.ratio(text_1, text_2)
+    return (r == 100)
+
+
+def is_date_matched(dt_str_1, dt_str_2):
+    is_matched = False
+
+    def parse_dt(dt_str):
+        if '/' in dt_str:
+            dt = dateparser.parse(dt_str, settings={'DATE_ORDER': 'DMY'})
+        else:
+            dt = dateparser.parse(dt_str)
+        return dt
+
+    dt_1 = parse_dt(dt_str_1)
+    dt_2 = parse_dt(dt_str_2)
+    if dt_1 is not None and dt_2 is not None and dt_1 == dt_2:
+        is_matched = True
+    return is_matched
 
