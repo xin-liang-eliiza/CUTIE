@@ -90,7 +90,7 @@ def label_gt(anno_bucket: str = transform_bucket, gt_bucket: str = landing_bucke
     '''
     Programmatically label data using histocial ground truth from CAS
     '''
-    columns = ['photo_tracking_number', 'category_id', 'member_number', 'provider_number.1', 'claim_item_number', 'claim_item_entry', 'tooth_code', 'date_of_service', 'item_fee', 'script_number']
+    columns = ['photo_tracking_number', 'category_id', 'member_number', 'page_number', 'provider_number.1', 'claim_item_number', 'claim_item_entry', 'tooth_code', 'date_of_service', 'item_fee', 'script_number']
     gt_columns = ['provider_number.1', 'claim_item_number', 'tooth_code', 'date_of_service', 'item_fee']
     
     anno_text_list = list_s3_keys(anno_bucket, anno_text_key_prefix.rpartition('/')[0])
@@ -100,12 +100,14 @@ def label_gt(anno_bucket: str = transform_bucket, gt_bucket: str = landing_bucke
     gt_df["photo_tracking_number"] = gt_df["photo_tracking_number"].apply(int).apply(str)
     for key in anno_text_list:
         file_name = key.rpartition('/')[-1]
-        tracking_num = file_name.split('_')[0]
+        tracking_num, suffix = file_name.split('_')
+        page_num, _ = suffix.split('_')
         tracking_num = tracking_num.lstrip('0')
 
         anno_json = read_json_from_s3(anno_bucket, key)
         print("tracking num", tracking_num)
         gt = gt_df[gt_df["photo_tracking_number"] == tracking_num] 
+        gt = gt.sort_values('page_number')
         text_boxes = anno_json['text_boxes']
         label_fields = match_text(text_boxes, gt, gt_columns)
         anno_json['fields'] = label_fields
@@ -119,8 +121,10 @@ def label_gt(anno_bucket: str = transform_bucket, gt_bucket: str = landing_bucke
 def match_text(text_boxes: List, target_df: pd.DataFrame, target_columns: List):
     mapping = gt_class_mapping()
     label_fields = []
-    for index, row in target_df.iterrows():
-        for col in target_columns:
+    for col in target_columns:
+        value_ids = []
+        value_text = []
+        for index, row in target_df.iterrows():
             if not isinstance(row[col], str) and math.isnan(row[col]):
                 continue
             targets = str(row[col]).split(' ')
@@ -129,17 +133,34 @@ def match_text(text_boxes: List, target_df: pd.DataFrame, target_columns: List):
                 targets = targets + ["$" + t for t in targets]
             cls = mapping[col]
             if col == "date_of_service":
-                value_ids = [t['id'] for t in text_boxes if any([is_date_matched(t['text'], i) for i in targets])]
-                value_text = [t['text'] for t in text_boxes if any([is_date_matched(t['text'], i) for i in targets])]
+                value_ids.extend([t['id'] for t in text_boxes if any([is_date_matched(t['text'], i) for i in targets])])
+                value_text.extend([t['text'] for t in text_boxes if any([is_date_matched(t['text'], i) for i in targets])])
             else:
                 #value_ids = [t['id'] for t in text_boxes if any([is_text_matched(t['text'], i) for i in targets])]
                 #value_text = [t['text'] for t in text_boxes if any([is_text_matched(t['text'], i) for i in targets])]
-                value_ids = [t['id'] for t in text_boxes if t['text'] in targets]
-                value_text = [t['text'] for t in text_boxes if t['text'] in targets]
+                value_ids.extend([t['id'] for t in text_boxes if t['text'] in targets])
+                value_text.extend([t['text'] for t in text_boxes if t['text'] in targets])
             if value_ids:
                 field_label = get_field_label(cls, value_ids, value_text)
                 label_fields.append(field_label._asdict())
 
     return label_fields
+
     
+    
+def merge_label_fields(anno_json):
+    label_fields = []
+    for cls in label_classes:
+        value_ids = []
+        value_text = []
+        for f in anno_json['fields']:
+            if f['field_name'] == cls:
+                value_ids.extend(f['value_id'])
+                value_text.extend(f['value_text'])
+        if value_ids:
+            field_label = get_field_label(cls, value_ids, value_text)
+            label_fields.append(field_label._asdict())
+    anno_json['fields'] = label_fields
+    return anno_json
+        
 

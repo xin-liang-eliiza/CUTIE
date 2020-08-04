@@ -56,6 +56,15 @@ def write_json_to_s3(json_data, bucket: str, key: str):
     obj.put(Body=json.dumps(json_data, indent=4), ServerSideEncryption="AES256")
 
 
+def download_json_from_s3(bucket: str, keys: List, out_dir: str):
+    for key in keys:
+        file_name = key.rpartition('/')[-1]
+        json_data = read_json_from_s3(bucket, key)
+        if json_data['fields']:
+            json.dump(json_data, open("{}/{}".format(out_dir, file_name), "w"), indent=4)
+    
+
+
 def read_csv_from_s3(bucket: str, key: str):
     obj = s3.Bucket(bucket).Object(key)
     csv = obj.get()['Body'].read().decode('utf-8')
