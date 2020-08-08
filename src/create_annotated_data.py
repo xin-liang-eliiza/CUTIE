@@ -18,7 +18,7 @@ textract_key_prefix = "claim-receipt-recognition/textract_raw_results/2020/01/ca
 anno_text_key_prefix = "claim-receipt-recognition/annotations/text/category_id_19/{}_annotation.json"
 anno_im_key_prefix = "claim-receipt-recognition/annotations/images/category_id_19/{}"
 label_text_key_prefix = "claim-receipt-recognition/annotations/labels/category_id_19/{}_label.json"
-auto_label_text_key_prefix = "claim-receipt-recognition/annotations/auto_labels/category_id_19/{}_auto_label.json"
+auto_label_text_key_prefix = "claim-receipt-recognition/annotations/auto_labels_v2/category_id_19/{}_auto_label.json"
 
 cas_csv_key = "claim-receipt-recognition/CAS submissions 2019-11-01 to 2020-01-12.csv"
 
@@ -100,8 +100,7 @@ def label_gt(anno_bucket: str = transform_bucket, gt_bucket: str = landing_bucke
     gt_df["photo_tracking_number"] = gt_df["photo_tracking_number"].apply(int).apply(str)
     for key in anno_text_list:
         file_name = key.rpartition('/')[-1]
-        tracking_num, suffix = file_name.split('_')
-        page_num, _ = suffix.split('_')
+        tracking_num = file_name.split('_')[0]
         tracking_num = tracking_num.lstrip('0')
 
         anno_json = read_json_from_s3(anno_bucket, key)
@@ -113,7 +112,8 @@ def label_gt(anno_bucket: str = transform_bucket, gt_bucket: str = landing_bucke
         anno_json['fields'] = label_fields
 
         print("key", auto_label_text_key_prefix.format(file_name.split('.')[0]))
-        write_json_to_s3(anno_json, transform_bucket, auto_label_text_key_prefix.format(file_name.split('.')[0]))
+        if anno_json['fields']:
+            write_json_to_s3(anno_json, transform_bucket, auto_label_text_key_prefix.format(file_name.split('.')[0]))
 
     return
 
@@ -135,14 +135,17 @@ def match_text(text_boxes: List, target_df: pd.DataFrame, target_columns: List):
             if col == "date_of_service":
                 value_ids.extend([t['id'] for t in text_boxes if any([is_date_matched(t['text'], i) for i in targets])])
                 value_text.extend([t['text'] for t in text_boxes if any([is_date_matched(t['text'], i) for i in targets])])
+                #print("date targets", targets)
+                #print("date ids", value_ids)
+                #print("date text", value_text)
             else:
                 #value_ids = [t['id'] for t in text_boxes if any([is_text_matched(t['text'], i) for i in targets])]
                 #value_text = [t['text'] for t in text_boxes if any([is_text_matched(t['text'], i) for i in targets])]
                 value_ids.extend([t['id'] for t in text_boxes if t['text'] in targets])
                 value_text.extend([t['text'] for t in text_boxes if t['text'] in targets])
-            if value_ids:
-                field_label = get_field_label(cls, value_ids, value_text)
-                label_fields.append(field_label._asdict())
+        if value_ids:
+            field_label = get_field_label(cls, value_ids, value_text)
+            label_fields.append(field_label._asdict())
 
     return label_fields
 

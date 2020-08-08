@@ -22,7 +22,7 @@ def read_image_from_s3(bucket: str, key: str, boxes: List = [], displayed=False,
     obj = s3.Bucket(bucket).Object(key)
     im = Image.open(obj.get()['Body'])
     im_file = key.rpartition('/')[-1]
-    im.save("../invoice_data/{}".format(im_file))
+    im.save("../eval_data/{}".format(im_file))
     if boxes:
         draw = ImageDraw.Draw(im)
         for b in boxes:
