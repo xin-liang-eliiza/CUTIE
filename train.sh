@@ -1,15 +1,21 @@
 #! /bin/bash
 
 
+### Build customised dictionary 
+python3 main_build_dict.py \
+	--doc_path 'eval_data/' \
+	--dict_path 'dict/DENTAL'
+
+
 python3 main_train_json.py \
 	--doc_path 'eval_data/' \
-	--save_prefix 'INVOICE' \
+	--save_prefix 'DENTAL' \
 	--test_path '' \
 	--embedding_file '' \
 	--ckpt_path 'graph/' \
 	--tokenize True \
 	--update_dict True \
-	--load_dict_from_path 'dict/INVOICE' \
+	--load_dict_from_path 'dict/DENTAL' \
 	--rows_segment 72 \
 	--cols_segment 72 \
 	--augment_strategy 1 \
