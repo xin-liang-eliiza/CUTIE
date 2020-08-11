@@ -1,7 +1,7 @@
 import os
 import json
 from typing import Dict, List
-from fuzzywuzzy import fuzz
+#from fuzzywuzzy import fuzz
 import dateparser
 
 from PIL import Image, ImageDraw, ImageFont
@@ -9,6 +9,7 @@ from io import BytesIO, StringIO
 import numpy as np
 import pandas as pd
 from IPython.display import display
+from shapely.geometry import box as polygon
 
 import boto3
 
@@ -79,9 +80,9 @@ def list_s3_keys(bucket: str, prefix: str) -> List:
     return keys
 
 
-def is_text_matched(text_1, text_2):
-    r = fuzz.ratio(text_1, text_2)
-    return (r == 100)
+#def is_text_matched(text_1, text_2):
+#    r = fuzz.ratio(text_1, text_2)
+#    return (r == 100)
 
 
 def is_date_matched(dt_str_1, dt_str_2):
@@ -100,3 +101,13 @@ def is_date_matched(dt_str_1, dt_str_2):
         is_matched = True
     return is_matched
 
+
+def get_overlap_bbox(pred_bbox, text_boxes, overlap_thresh=0.9):
+    pred_poly = polygon(pred_bbox[0], pred_bbox[1], pred_bbox[2], pred_bbox[3])
+    for item in text_boxes:
+        bbox = item['bbox']
+        tpoly = polygon(bbox[0], bbox[1], bbox[2], bbox[3])
+        overlap = pred_poly.intersection(tpoly)
+        if (overlap.area / pred_poly.area) > overlap_thresh:
+            return bbox
+    return None

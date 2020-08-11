@@ -3,13 +3,19 @@
 # xiaohui.zhao@outlook.com
 import numpy as np
 import csv
+import json
+import os
 from os.path import join
 try:
     import cv2
 except ImportError:
     pass
 
+from src.utils import get_overlap_bbox
+
 c_threshold = 0.5
+#c_threshold = 0.4
+
 
 def cal_accuracy(data_loader, grid_table, gt_classes, model_output_val, label_mapids, bbox_mapids):
     #num_tp = 0
@@ -193,6 +199,10 @@ def vis_bbox(data_loader, file_prefix, grid_table, gt_classes, model_output_val,
     
     max_len = 768*2 # upper boundary of image display size 
     img = cv2.imread(join(file_prefix, file_name))
+
+    anno_json_path = os.path.join("eval_data", file_name.split('.')[0]+"_auto_label.json")
+    text_boxes = json.load(open(anno_json_path))["text_boxes"]
+
     if img is not None:    
         shape = list(img.shape)
         
@@ -228,10 +238,17 @@ def vis_bbox(data_loader, file_prefix, grid_table, gt_classes, model_output_val,
                 cv2.rectangle(overlay_box, (x,y), (x+w,y+h), gt_color[gt_id], -1)
                     
             if max(logits[i]) > c_threshold:
-                inf_id = np.argmax(logits[i])
-                if inf_id:                
-                    cv2.rectangle(overlay_line, (x+bbox_pad,y+bbox_pad), \
-                                  (x+bbox_pad+w,y+bbox_pad+h), inf_color[inf_id], max_len//768*2)
+                if len(bboxes[i]) > 0:
+                    x_, y_, w_, h_ = bboxes[i]
+                    inf_id = np.argmax(logits[i])
+                    text_box = get_overlap_bbox([x_, y_, x_+w_, y_+h_], text_boxes)
+                    if text_box:
+                        text_box = [int(t*factor) for t in text_box]
+                        if inf_id:                
+                            #cv2.rectangle(overlay_line, (x+bbox_pad,y+bbox_pad), \
+                            #              (x+bbox_pad+w,y+bbox_pad+h), inf_color[inf_id], max_len//768*2)
+                            cv2.rectangle(overlay_line, (text_box[0]+bbox_pad, text_box[1]+bbox_pad), \
+                                          (text_box[2]+bbox_pad, text_box[3]+bbox_pad), inf_color[inf_id], max_len//768*2)
                 
             #text = data_loader.classes[gt_id] + '|' + data_loader.classes[inf_id]
             #cv2.putText(img, text, (x,y), font, font_size, ft_color)  
@@ -258,8 +275,8 @@ def vis_bbox(data_loader, file_prefix, grid_table, gt_classes, model_output_val,
         cv2.addWeighted(overlay_box, alpha, img, 1-alpha, 0, img)
         cv2.addWeighted(overlay_line, 1-alpha, img, 1, 0, img)
         cv2.imwrite('results/' + file_name[:-4]+'.png', img)        
-        cv2.imshow("test", img)
-        cv2.waitKey(0)
+        #cv2.imshow("test", img)
+        #cv2.waitKey(0)
         
 
 def cal_accuracy_table(data_loader, grid_table, gt_classes, model_output_val, label_mapids, bbox_mapids):
