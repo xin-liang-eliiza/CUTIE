@@ -46,6 +46,7 @@ params = parser.parse_args()
 if __name__ == '__main__':
     # data
     #data_loader = DataLoader(params, True, True) # True to use 25% training data
+    #data_loader = DataLoader(params, update_dict=False, load_dictionary=True, data_split=0.75) # False to provide a path with only test data
     data_loader = DataLoader(params, update_dict=False, load_dictionary=True, data_split=0.75) # False to provide a path with only test data
     num_words = max(20000, data_loader.num_words)
     num_classes = data_loader.num_classes
@@ -130,7 +131,8 @@ if __name__ == '__main__':
                          np.array(data['gt_classes'])[0], np.array(model_output_val)[0], file_name, 
                          np.array(bboxes), shape)
 
-        recall = sum(recalls) / len(recalls)
-        acc_strict = sum(accs_strict) / len(accs_strict)
-        acc_soft = sum(accs_soft) / len(accs_soft)
-        print('EVALUATION ACC (Recall/Acc): %.3f / %.3f (%.3f) \n'%(recall, acc_strict, acc_soft))
+        if recalls:
+            recall = sum(recalls) / len(recalls)
+            acc_strict = sum(accs_strict) / len(accs_strict)
+            acc_soft = sum(accs_soft) / len(accs_soft)
+            print('EVALUATION ACC (Recall/Acc): %.3f / %.3f (%.3f) \n'%(recall, acc_strict, acc_soft))
