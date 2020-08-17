@@ -109,5 +109,5 @@ def get_overlap_bbox(pred_bbox, text_boxes, overlap_thresh=0.9):
         tpoly = polygon(bbox[0], bbox[1], bbox[2], bbox[3])
         overlap = pred_poly.intersection(tpoly)
         if (overlap.area / pred_poly.area) > overlap_thresh:
-            return bbox
+            return item
     return None

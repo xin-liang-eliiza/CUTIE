@@ -241,9 +241,9 @@ def vis_bbox(data_loader, file_prefix, grid_table, gt_classes, model_output_val,
                 if len(bboxes[i]) > 0:
                     x_, y_, w_, h_ = bboxes[i]
                     inf_id = np.argmax(logits[i])
-                    text_box = get_overlap_bbox([x_, y_, x_+w_, y_+h_], text_boxes)
-                    if text_box:
-                        text_box = [int(t*factor) for t in text_box]
+                    text_box_item = get_overlap_bbox([x_, y_, x_+w_, y_+h_], text_boxes)
+                    if text_box_item:
+                        text_box = [int(t*factor) for t in text_box['bbox']]
                         if inf_id:                
                             #cv2.rectangle(overlay_line, (x+bbox_pad,y+bbox_pad), \
                             #              (x+bbox_pad+w,y+bbox_pad+h), inf_color[inf_id], max_len//768*2)
