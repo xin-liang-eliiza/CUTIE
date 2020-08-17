@@ -1,0 +1,2 @@
+['remote "cutie-dental-model"']
+    url = s3://nib-prod-analytics-privacy-transformed-ap-southeast-2/claim-receipt-recognition/models/CUTIE/dental

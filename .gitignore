@@ -1,7 +1,7 @@
 outputs/
 data/
 logs/
-graph/
+#graph/
 results/
 *.pyc
 .DS_Store
