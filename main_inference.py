@@ -1,15 +1,24 @@
-
+import os, csv, timeit
 import tensorflow as tf
 import numpy as np
 import argparse
 import json
-import os, csv, timeit
+from collections import namedtuple
+from typing import Optional, List
+import pprint
+
 os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 from model_cutie_aspp import CUTIERes as CUTIEv1
 from model_cutie2_aspp import CUTIE2 as CUTIEv2
 from data_loader_json import DataLoader
 from utils import *
+
+from src.utils import *
+from src.format_data import TextBox
+
+
+Prediction = namedtuple("Prediction", ["field_name", "text_box", "confidence"])
 
 
 class Config:
@@ -52,7 +61,7 @@ def inference_input(doc_path):
     return params
 
 
-def infer(doc_path):
+def infer(doc_path) -> List[Prediction]:
     params = inference_input(doc_path)
 
     data_loader = DataLoader(params, params.classes, update_dict=False, load_dictionary=True, data_split=0.0) # False to provide a path with only test data
@@ -138,13 +147,46 @@ def get_predicted_bboxes(data_loader, file_prefix, grid_table, gt_classes, model
                 x_, y_, w_, h_ = bboxes[i]
                 inf_id = np.argmax(logits[i])
                 text_box = get_overlap_bbox([x_, y_, x_+w_, y_+h_], text_boxes)
+                text_box = TextBox(**text_box)
                 pd_class = data_loader.classes[inf_id]
-                predictions.append((pd_class, text_box))
+                predictions.append(Prediction(pd_class, text_box, max(logits[i])))
 
     return predictions
+
+
+def post_processing(predictions):
+    sanitised_predictions = [sanitise_prediction(p) for p in predictions if sanitise_prediction(p) is not None]
+    final_predictions = sanitised_predictions
+    #TODO geometry post processing
+    return final_predictions
+
+
+def sanitise_prediction(prediction: Prediction) -> Optional[Prediction]:
+    result = None
+    if prediction.field_name == "ServiceDate":
+        if is_valid_date(prediction.text_box.text):
+            result = prediction
+    elif prediction.field_name == "ProviderNum":
+        provider_num = validate_provider(prediction.text_box.text)
+        if provider_num is not None:
+            text_box = prediction.text_box._replace(text=provider_num)
+            result = prediction._replace(text_box=text_box)
+    elif prediction.field_name == "ItemNum":
+        if is_valid_item_num(prediction.text_box.text):
+            result = prediction
+    elif prediction.field_name == "ItemCharge":
+        item_charge = validate_charge(prediction.text_box.text)
+        if item_charge is not None:
+            text_box = prediction.text_box._replace(text=item_charge)
+            result = prediction._replace(text_box=text_box)
+    return result
     
 
 if __name__ == "__main__":
     doc_path = "inference_data/"
     results = infer(doc_path)
+    results = post_processing(results[0])
+    pp = pprint.PrettyPrinter(indent=4)
+    pp.pprint(results)
     print(json.dumps(results, indent=4))
+    

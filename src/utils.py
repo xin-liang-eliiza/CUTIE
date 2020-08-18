@@ -3,6 +3,8 @@ import json
 from typing import Dict, List
 #from fuzzywuzzy import fuzz
 import dateparser
+from datetime import datetime, timedelta
+import locale
 
 from PIL import Image, ImageDraw, ImageFont
 from io import BytesIO, StringIO
@@ -111,3 +113,39 @@ def get_overlap_bbox(pred_bbox, text_boxes, overlap_thresh=0.9):
         if (overlap.area / pred_poly.area) > overlap_thresh:
             return item
     return None
+
+
+def is_valid_date(dt_str, delta_days_thresh=730):
+    is_valid = False
+    dt = dateparser.parse(dt_str)
+    upper_limit = datetime.now()
+    lower_limit = upper_limit - timedelta(days=delta_days_thresh)
+    if lower_limit <= dt <= upper_limit:
+        is_valid = True
+    return is_valid
+     
+
+def validate_charge(charge_str):
+    charge = None
+    locale.setlocale(locale.LC_ALL, '')
+    try:
+        charge_num = locale.atof(charge_str.strip("$"))
+        if charge_num > 0.0:
+            charge = charge_num
+    except Exception as e:
+        print("Error occurred in validate_charge: ", repr(e))
+    return charge
+
+
+def is_valid_item_num(item_num_str):
+    is_valid = False
+    if item_num_str.isdigit():
+        # TODO item number lookup
+        is_valid = True
+    return is_valid
+
+
+def validate_provider(provider_num):
+    # TODO provider DB lookup
+    return provider_num
+
