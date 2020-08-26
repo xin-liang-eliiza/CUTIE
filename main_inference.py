@@ -4,8 +4,10 @@ import numpy as np
 import argparse
 import json
 from collections import namedtuple
-from typing import Optional, List
+from typing import Optional, List, Tuple
 import pprint
+import hdbscan
+from sklearn.cluster import MeanShift
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
@@ -19,6 +21,7 @@ from src.format_data import TextBox
 
 
 Prediction = namedtuple("Prediction", ["field_name", "text_box", "confidence"])
+item_fields = ["ServiceDate", "ItemNum", "ItemCharge", "ToothId"]
 
 
 class Config:
@@ -50,7 +53,7 @@ class Config:
         self.e_ckpt_path = "graph/"
         self.ckpt_file = "CUTIE_atrousSPP_d20000c6(r80c80)_iter_900.ckpt"
         self.load_dict_from_path = "dict/DENTAL"
-    
+
 
 def inference_input(doc_path):
     cfg = Config(doc_path)
@@ -141,6 +144,7 @@ def get_predicted_bboxes(data_loader, file_prefix, grid_table, gt_classes, model
     text_boxes = json.load(open(anno_json_path))["text_boxes"]
 
     predictions = []
+    existing_bboxes = []
     for i in range(len(data_input_flat)):
         if max(logits[i]) > c_threshold:
             if len(bboxes[i]) > 0:
@@ -148,17 +152,82 @@ def get_predicted_bboxes(data_loader, file_prefix, grid_table, gt_classes, model
                 inf_id = np.argmax(logits[i])
                 text_box = get_overlap_bbox([x_, y_, x_+w_, y_+h_], text_boxes)
                 text_box = TextBox(**text_box)
-                pd_class = data_loader.classes[inf_id]
-                predictions.append(Prediction(pd_class, text_box, max(logits[i])))
+                # Avoid duplicate results
+                if text_box.bbox not in existing_bboxes:
+                    pd_class = data_loader.classes[inf_id]
+                    predictions.append(Prediction(pd_class, text_box, float(max(logits[i]))))
+                    existing_bboxes.append(text_box.bbox)
 
     return predictions
 
 
 def post_processing(predictions):
     sanitised_predictions = [sanitise_prediction(p) for p in predictions if sanitise_prediction(p) is not None]
+    predictions_to_cluster = [p for p in sanitised_predictions if p.field_name in item_fields]
+    clusters = cluster_prediction(predictions_to_cluster)
     final_predictions = sanitised_predictions
     #TODO geometry post processing
     return final_predictions
+
+
+def cluster_prediction(predictions):
+    clustered_predictions = {}
+    
+    # Coarse clustering
+    data_to_cluster = get_clustering_data_from_predictions(predictions)
+    clusters = run_clustering(data_to_cluster, method="meanshift")
+
+    clusters_v1 = [predictions[x] for x in np.where(clusters == 0)[0]]
+    predictions = clusters_v1
+
+    # Fine-grain clustering
+    data_to_cluster = get_clustering_data_from_predictions(predictions)
+    clusters = run_clustering(data_to_cluster, method="hdbscan")
+    unique_clusters = np.unique(clusters)
+    for i in unique_clusters:
+        clustered_predictions[i] = [predictions[x] for x in np.where(clusters == i)[0]]
+        print("CLUCSTER ", i)
+        print(json.dumps(clustered_predictions[i], indent=4))
+    
+
+    return clustered_predictions
+
+
+def get_clustering_data_from_predictions(predictions):
+    data = []
+    for p in predictions:
+        centroid = get_bbox_centroid(p.text_box.bbox)
+        data.append((p.text_box.id, centroid[1]))
+    #data = np.array(data).reshape(-1, 1)
+    data = np.array(data)
+    print("Cluster data: ", data)
+
+    return data
+
+
+def run_clustering(data, method="meanshift"):
+    clusters = []
+    if method == "hdbscan":
+        clusterer = hdbscan.HDBSCAN(algorithm='best', min_cluster_size=2)
+        clusterer.fit(data)
+        clusters = clusterer.labels_ 
+    elif method == "meanshift":
+        ms = MeanShift(bandwidth=None, bin_seeding=True)
+        ms.fit(data)
+        clusters = ms.labels_
+    print("Clusters: ", clusters)
+
+    return clusters
+
+
+def normalise(inputs: np.array) -> np.array:
+    return inputs / max(inputs)
+    
+
+def get_bbox_centroid(bbox: List) -> Tuple:
+    x_c = (bbox[0] + bbox[2]) / 2
+    y_c = (bbox[1] + bbox[3]) / 2
+    return (x_c, y_c)
 
 
 def sanitise_prediction(prediction: Prediction) -> Optional[Prediction]:
@@ -185,8 +254,8 @@ def sanitise_prediction(prediction: Prediction) -> Optional[Prediction]:
 if __name__ == "__main__":
     doc_path = "inference_data/"
     results = infer(doc_path)
-    results = post_processing(results[0])
-    pp = pprint.PrettyPrinter(indent=4)
-    pp.pprint(results)
-    print(json.dumps(results, indent=4))
+    for r in results:       
+        print("RESULTS:")
+        results = post_processing(r)
+        #print(json.dumps(results, indent=4))
     

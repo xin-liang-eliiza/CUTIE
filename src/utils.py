@@ -118,10 +118,11 @@ def get_overlap_bbox(pred_bbox, text_boxes, overlap_thresh=0.9):
 def is_valid_date(dt_str, delta_days_thresh=730):
     is_valid = False
     dt = dateparser.parse(dt_str)
-    upper_limit = datetime.now()
-    lower_limit = upper_limit - timedelta(days=delta_days_thresh)
-    if lower_limit <= dt <= upper_limit:
-        is_valid = True
+    if dt is not None:
+        upper_limit = datetime.now()
+        lower_limit = upper_limit - timedelta(days=delta_days_thresh)
+        if lower_limit <= dt <= upper_limit:
+            is_valid = True
     return is_valid
      
 

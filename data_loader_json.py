@@ -78,9 +78,9 @@ class DataLoader():
         self.load_dictionary = load_dictionary # load dictionary from file rather than start from empty 
         self.dict_path = params.load_dict_from_path if load_dictionary else params.dict_path
         if self.load_dictionary:
-            self.dictionary = np.load(self.dict_path + '_dictionary.npy').item()
-            self.word_to_index = np.load(self.dict_path + '_word_to_index.npy').item()
-            self.index_to_word = np.load(self.dict_path + '_index_to_word.npy').item()
+            self.dictionary = np.load(self.dict_path + '_dictionary.npy', allow_pickle=True).item()
+            self.word_to_index = np.load(self.dict_path + '_word_to_index.npy', allow_pickle=True).item()
+            self.index_to_word = np.load(self.dict_path + '_index_to_word.npy', allow_pickle=True).item()
         else:
             self.dictionary = {'[PAD]':0, '[UNK]':0} # word/counts. to be updated in self.load_data() and self._update_docs_dictionary()
             self.word_to_index = {}
