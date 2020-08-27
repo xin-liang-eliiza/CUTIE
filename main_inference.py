@@ -4,7 +4,7 @@ import numpy as np
 import argparse
 import json
 from collections import namedtuple
-from typing import Optional, List, Tuple
+from typing import Optional, List, Tuple, Dict
 import pprint
 import hdbscan
 from sklearn.cluster import MeanShift
@@ -20,8 +20,11 @@ from src.utils import *
 from src.format_data import TextBox
 
 
-Prediction = namedtuple("Prediction", ["field_name", "text_box", "confidence"])
 item_fields = ["ServiceDate", "ItemNum", "ItemCharge", "ToothId"]
+non_item_fields = ["ProviderNum"]
+
+Prediction = namedtuple("Prediction", ["field_name", "text_box", "confidence"])
+ExtractedField = namedtuple("ExtractedField", ["name", "value", "confidence"])
 
 
 class Config:
@@ -151,6 +154,8 @@ def get_predicted_bboxes(data_loader, file_prefix, grid_table, gt_classes, model
                 x_, y_, w_, h_ = bboxes[i]
                 inf_id = np.argmax(logits[i])
                 text_box = get_overlap_bbox([x_, y_, x_+w_, y_+h_], text_boxes)
+                if text_box is None:
+                    continue 
                 text_box = TextBox(**text_box)
                 # Avoid duplicate results
                 if text_box.bbox not in existing_bboxes:
@@ -163,11 +168,32 @@ def get_predicted_bboxes(data_loader, file_prefix, grid_table, gt_classes, model
 
 def post_processing(predictions):
     sanitised_predictions = [sanitise_prediction(p) for p in predictions if sanitise_prediction(p) is not None]
+    non_cluster_predictions = [p for p in sanitised_predictions if p.field_name not in item_fields]
     predictions_to_cluster = [p for p in sanitised_predictions if p.field_name in item_fields]
     clusters = cluster_prediction(predictions_to_cluster)
-    final_predictions = sanitised_predictions
-    #TODO geometry post processing
+    
+    final_predictions = parse_final_results(non_cluster_predictions, clusters)
     return final_predictions
+
+
+def parse_final_results(non_clusters: List[Prediction], clusters: Dict):
+    final_results = [] 
+    general_field_dict = {}
+    for p in non_clusters:
+        general_field_dict.update({p.field_name:
+            ExtractedField(p.field_name, p.text_box.text, p.confidence)
+        })
+    for key, values in clusters.items():
+        item_dict = {}
+        sorted_values = sorted(values, key=lambda x: x.text_box.id)
+        if key == -1 and len(clusters) > 1:
+            continue
+        for v in sorted_values:
+            if v.field_name not in item_dict: 
+                item_dict.update({v.field_name: ExtractedField(v.field_name, v.text_box.text, v.confidence)})
+        item_dict.update(general_field_dict)
+        final_results.append(item_dict)
+    return final_results
 
 
 def cluster_prediction(predictions):
@@ -189,7 +215,6 @@ def cluster_prediction(predictions):
         print("CLUCSTER ", i)
         print(json.dumps(clustered_predictions[i], indent=4))
     
-
     return clustered_predictions
 
 
@@ -220,16 +245,6 @@ def run_clustering(data, method="meanshift"):
     return clusters
 
 
-def normalise(inputs: np.array) -> np.array:
-    return inputs / max(inputs)
-    
-
-def get_bbox_centroid(bbox: List) -> Tuple:
-    x_c = (bbox[0] + bbox[2]) / 2
-    y_c = (bbox[1] + bbox[3]) / 2
-    return (x_c, y_c)
-
-
 def sanitise_prediction(prediction: Prediction) -> Optional[Prediction]:
     result = None
     if prediction.field_name == "ServiceDate":
@@ -257,5 +272,6 @@ if __name__ == "__main__":
     for r in results:       
         print("RESULTS:")
         results = post_processing(r)
-        #print(json.dumps(results, indent=4))
+        print("FINAL RESULTS:")
+        print(json.dumps(results, indent=4))
     

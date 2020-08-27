@@ -1,6 +1,6 @@
 import os
 import json
-from typing import Dict, List
+from typing import Dict, List, Tuple
 #from fuzzywuzzy import fuzz
 import dateparser
 from datetime import datetime, timedelta
@@ -150,3 +150,12 @@ def validate_provider(provider_num):
     # TODO provider DB lookup
     return provider_num
 
+
+def normalise(inputs: np.array) -> np.array:
+    return inputs / max(inputs)
+    
+
+def get_bbox_centroid(bbox: List) -> Tuple:
+    x_c = (bbox[0] + bbox[2]) / 2
+    y_c = (bbox[1] + bbox[3]) / 2
+    return (x_c, y_c)
