@@ -97,6 +97,7 @@ def infer(doc_path) -> List[Prediction]:
         
         num_test = len(data_loader.validation_docs)
         results = []
+        result_files = []
         for i in range(num_test):
             predictions = []
             data = data_loader.fetch_validation_data()
@@ -132,7 +133,8 @@ def infer(doc_path) -> List[Prediction]:
                 predictions = get_predicted_bboxes(data_loader, params.doc_path, np.array(data['grid_table'])[0], 
                          np.array(data['gt_classes'])[0], np.array(model_output_val)[0], file_name, np.array(bboxes), shape)
                 results.append(predictions)
-        return results
+                result_files.append(file_name)
+        return results, result_files
 
 
 def get_predicted_bboxes(data_loader, file_prefix, grid_table, gt_classes, model_output_val, file_name,  bboxes, shape):
@@ -202,8 +204,12 @@ def cluster_prediction(predictions):
     # Coarse clustering
     data_to_cluster = get_clustering_data_from_predictions(predictions)
     clusters = run_clustering(data_to_cluster, method="meanshift")
+    
+    major_cluster_thresh = 3
+    unique_clusters, unique_counts = np.unique(clusters, return_counts=True)
+    major_cluster_ids = unique_clusters[np.where(unique_counts > major_cluster_thresh)]
 
-    clusters_v1 = [predictions[x] for x in np.where(clusters == 0)[0]]
+    clusters_v1 = [predictions[x] for i in major_cluster_ids for x in np.where(clusters == i)[0]]
     predictions = clusters_v1
 
     # Fine-grain clustering
@@ -237,7 +243,7 @@ def run_clustering(data, method="meanshift"):
         clusterer.fit(data)
         clusters = clusterer.labels_ 
     elif method == "meanshift":
-        ms = MeanShift(bandwidth=None, bin_seeding=True)
+        ms = MeanShift(bandwidth=None, bin_seeding=False)
         ms.fit(data)
         clusters = ms.labels_
     print("Clusters: ", clusters)
@@ -268,10 +274,14 @@ def sanitise_prediction(prediction: Prediction) -> Optional[Prediction]:
 
 if __name__ == "__main__":
     doc_path = "inference_data/"
-    results = infer(doc_path)
-    for r in results:       
-        print("RESULTS:")
+    results, result_files = infer(doc_path)
+    inference_dict = {}
+    for ind, r in enumerate(results):       
+        print("RESULTS for ", result_files[ind])
         results = post_processing(r)
-        print("FINAL RESULTS:")
+        print("FINAL RESULTS for", result_files[ind])
         print(json.dumps(results, indent=4))
+        inference_dict[result_files[ind]] = results
+    json.dump(inference_dict, open("inference_results.json", "w"), indent=4)
+
     
