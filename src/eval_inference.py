@@ -93,8 +93,6 @@ def run(gt_bucket, gt_csv_key, pd_json, gt_columns=gt_columns):
     gt_df = gt_df[gt_columns]
     pd_df = pd_json_to_df(pd_json)
     pd_df = pd_df.drop_duplicates()
-    print(pd_df)
-    pd_df.to_csv("predictions.csv")
 
     gt_df = gt_df[gt_df["photo_tracking_number"].isin(pd_df["photo_tracking_number"])]
     gt_df = gt_df.dropna(subset=['date_of_service'])
@@ -108,6 +106,11 @@ def run(gt_bucket, gt_csv_key, pd_json, gt_columns=gt_columns):
         gt_df_new = gt_df_new.append(gt_temp, ignore_index=True)
     print(gt_df_new)
     gt_df_new.to_csv("ground_truth.csv")
+
+    pd_df["photo_tracking_number"] = pd_df["photo_tracking_number"].apply(float)
+    pd_df = pd_df[pd_df["photo_tracking_number"].isin(gt_df_new["photo_tracking_number"])]
+    print(pd_df)
+    pd_df.to_csv("predictions.csv")
     pd_cls_mapping = prediction_class_mapping()
     results = calc_accuracies(gt_df_new, pd_df, list(pd_cls_mapping.values())) 
     
