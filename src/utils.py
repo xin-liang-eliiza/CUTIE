@@ -87,15 +87,16 @@ def list_s3_keys(bucket: str, prefix: str) -> List:
 #    return (r == 100)
 
 
+def parse_dt(dt_str):
+    if '/' in dt_str:
+        dt = dateparser.parse(dt_str, settings={'DATE_ORDER': 'DMY'})
+    else:
+        dt = dateparser.parse(dt_str)
+    return dt
+
+
 def is_date_matched(dt_str_1, dt_str_2):
     is_matched = False
-
-    def parse_dt(dt_str):
-        if '/' in dt_str:
-            dt = dateparser.parse(dt_str, settings={'DATE_ORDER': 'DMY'})
-        else:
-            dt = dateparser.parse(dt_str)
-        return dt
 
     dt_1 = parse_dt(dt_str_1)
     dt_2 = parse_dt(dt_str_2)
@@ -165,7 +166,7 @@ def get_bbox_centroid(bbox: List) -> Tuple:
 
 
 def format_date(date_str):
-    result = "None"
+    result = ""
     if is_valid_date(date_str):
-        result = dateparser.parse(date_str).strftime("%Y-%m-%d")
+        result = parse_dt(date_str).strftime("%Y-%m-%d")
     return result

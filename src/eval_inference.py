@@ -1,3 +1,4 @@
+import math
 import pandas
 import json
 from collections import Counter, namedtuple
@@ -79,9 +80,10 @@ def pd_json_to_df(pd_json, pd_columns=pd_columns):
         photo_tracking_num, page_num = file_id.split("_")
         for val in values:
             item_dict = {j: val.get(i, [None, None, None])[1] for i, j in pd_cls_mapping.items()}
-            item_dict.update({"photo_tracking_number": photo_tracking_num, "page_number": page_num})
+            item_dict.update({"photo_tracking_number": photo_tracking_num, "page_number": float(page_num)})
             pd_df = pd_df.append(item_dict, ignore_index=True)
-    pd_df['date_of_service'] = pd_df['date_of_service'].apply(lambda x: format_date(x))
+    pd_df['date_of_service'] = pd_df['date_of_service'].apply(lambda x: format_date(x) if format_date(x) else float('nan'))
+    pd_df['provider_number.1'] = pd_df['provider_number.1'].apply(lambda x: x.strip("(").strip(")") if isinstance(x, str) else x)
     return pd_df
 
     
@@ -90,11 +92,24 @@ def run(gt_bucket, gt_csv_key, pd_json, gt_columns=gt_columns):
     gt_df = read_csv_from_s3(gt_bucket, gt_csv_key) 
     gt_df = gt_df[gt_columns]
     pd_df = pd_json_to_df(pd_json)
+    pd_df = pd_df.drop_duplicates()
     print(pd_df)
+    pd_df.to_csv("predictions.csv")
+
     gt_df = gt_df[gt_df["photo_tracking_number"].isin(pd_df["photo_tracking_number"])]
+    gt_df = gt_df.dropna(subset=['date_of_service'])
+    gt_df = gt_df.drop_duplicates()
     print(gt_df)
+    gt_df_new = pandas.DataFrame()
+    for ptn in list(set(pd_df["photo_tracking_number"].tolist())):
+        gt_temp = gt_df[gt_df["photo_tracking_number"] == float(ptn)]
+        pd_temp = pd_df[pd_df["photo_tracking_number"] == ptn]
+        gt_temp = gt_temp[gt_temp["page_number"].isin(pd_temp["page_number"])]
+        gt_df_new = gt_df_new.append(gt_temp, ignore_index=True)
+    print(gt_df_new)
+    gt_df_new.to_csv("ground_truth.csv")
     pd_cls_mapping = prediction_class_mapping()
-    results = calc_accuracies(gt_df, pd_df, list(pd_cls_mapping.values())) 
+    results = calc_accuracies(gt_df_new, pd_df, list(pd_cls_mapping.values())) 
     
     return results
 
