@@ -170,7 +170,11 @@ def get_predicted_bboxes(data_loader, file_prefix, grid_table, gt_classes, model
 
 def post_processing(predictions):
     sanitised_predictions = [sanitise_prediction(p) for p in predictions if sanitise_prediction(p) is not None]
-    non_cluster_predictions = [p for p in sanitised_predictions if p.field_name not in item_fields]
+    date_predictions = [p for p in sanitised_predictions if p.field_name == "ServiceDate"]
+    non_item_fields_new = non_item_fields
+    if len(date_predictions) == 1:
+        non_item_fields_new.append("ServiceDate")
+    non_cluster_predictions = [p for p in sanitised_predictions if p.field_name in non_item_fields_new]
     predictions_to_cluster = [p for p in sanitised_predictions if p.field_name in item_fields]
     clusters = cluster_prediction(predictions_to_cluster)
     
