@@ -277,11 +277,15 @@ if __name__ == "__main__":
     results, result_files = infer(doc_path)
     inference_dict = {}
     for ind, r in enumerate(results):       
-        print("RESULTS for ", result_files[ind])
-        results = post_processing(r)
-        print("FINAL RESULTS for", result_files[ind])
-        print(json.dumps(results, indent=4))
-        inference_dict[result_files[ind]] = results
+        print("{} th result".format(ind))
+        try:
+            print("RESULTS for ", result_files[ind])
+            results = post_processing(r)
+            print("FINAL RESULTS for", result_files[ind])
+            print(json.dumps(results, indent=4))
+            inference_dict[result_files[ind]] = results
+        except Exception as e:
+            print(e)
     json.dump(inference_dict, open("inference_results.json", "w"), indent=4)
 
     

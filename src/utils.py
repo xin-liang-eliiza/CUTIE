@@ -115,14 +115,17 @@ def get_overlap_bbox(pred_bbox, text_boxes, overlap_thresh=0.9):
     return None
 
 
-def is_valid_date(dt_str, delta_days_thresh=730):
+def is_valid_date(dt_str, delta_days_thresh=1080):
     is_valid = False
-    dt = dateparser.parse(dt_str)
-    if dt is not None:
-        upper_limit = datetime.now()
-        lower_limit = upper_limit - timedelta(days=delta_days_thresh)
-        if lower_limit <= dt <= upper_limit:
-            is_valid = True
+    try:
+        dt = dateparser.parse(dt_str)
+        if dt is not None:
+            upper_limit = datetime.now()
+            lower_limit = upper_limit - timedelta(days=delta_days_thresh)
+            if lower_limit <= dt <= upper_limit:
+                is_valid = True
+    except Exception as e:
+        print(e)
     return is_valid
      
 
@@ -159,3 +162,10 @@ def get_bbox_centroid(bbox: List) -> Tuple:
     x_c = (bbox[0] + bbox[2]) / 2
     y_c = (bbox[1] + bbox[3]) / 2
     return (x_c, y_c)
+
+
+def format_date(date_str):
+    result = "None"
+    if is_valid_date(date_str):
+        result = dateparser.parse(date_str).strftime("%Y-%m-%d")
+    return result
