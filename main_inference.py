@@ -1,4 +1,5 @@
 import os, csv, timeit
+import shutil
 import tensorflow as tf
 import numpy as np
 import argparse
@@ -67,10 +68,43 @@ def inference_input(doc_path):
     return params
 
 
-def infer(doc_path) -> List[Prediction]:
+def load_model(doc_path="inference_data"):
     params = inference_input(doc_path)
 
     data_loader = DataLoader(params, params.classes, update_dict=False, load_dictionary=True, data_split=0.0) # False to provide a path with only test data
+    num_words = max(20000, data_loader.num_words)
+    num_classes = data_loader.num_classes
+    # model
+    if params.use_cutie2:
+        network = CUTIEv2(num_words, num_classes, params)
+    else:
+        network = CUTIEv1(num_words, num_classes, params)
+    model_output = network.get_output('softmax')
+    
+    # evaluation
+    ckpt_saver = tf.train.Saver()
+    config = tf.ConfigProto(allow_soft_placement=True)
+    sess = tf.Session(config=config)
+    sess.run(tf.global_variables_initializer())
+    try:
+        ckpt_path = os.path.join(params.e_ckpt_path, params.save_prefix, params.ckpt_file)
+        ckpt = tf.train.get_checkpoint_state(ckpt_path)
+        print('Restoring from {}...'.format(ckpt_path))
+        ckpt_saver.restore(sess, ckpt_path)
+        print('{} restored'.format(ckpt_path))
+    except:
+        raise Exception('Check your pretrained {:s}'.format(ckpt_path))
+    return network, model_output, sess
+
+
+network, model_output, sess = load_model()
+
+
+def infer(doc_path, network=network, model_output=model_output, sess=sess) -> List[Prediction]:
+    params = inference_input(doc_path)
+
+    data_loader = DataLoader(params, params.classes, update_dict=False, load_dictionary=True, data_split=0.0) # False to provide a path with only test data
+    '''
     num_words = max(20000, data_loader.num_words)
     num_classes = data_loader.num_classes
 
@@ -94,47 +128,47 @@ def infer(doc_path) -> List[Prediction]:
             print('{} restored'.format(ckpt_path))
         except:
             raise Exception('Check your pretrained {:s}'.format(ckpt_path))
+   ''' 
+    num_test = len(data_loader.validation_docs)
+    results = []
+    result_files = []
+    for i in range(num_test):
+        predictions = []
+        data = data_loader.fetch_validation_data()
+        print('{:d} samples left to be tested'.format(num_test-i))
         
-        num_test = len(data_loader.validation_docs)
-        results = []
-        result_files = []
-        for i in range(num_test):
-            predictions = []
-            data = data_loader.fetch_validation_data()
-            print('{:d} samples left to be tested'.format(num_test-i))
-            
 #             grid_table = data['grid_table']
 #             gt_classes = data['gt_classes']
+        feed_dict = {
+            network.data_grid: data['grid_table'],
+        }
+        if params.use_cutie2:
             feed_dict = {
                 network.data_grid: data['grid_table'],
+                network.data_image: data['data_image'],
+                network.ps_1d_indices: data['ps_1d_indices']
             }
-            if params.use_cutie2:
-                feed_dict = {
-                    network.data_grid: data['grid_table'],
-                    network.data_image: data['data_image'],
-                    network.ps_1d_indices: data['ps_1d_indices']
-                }
-            fetches = [model_output]
-            
-            print(data['file_name'][0])
-            print(data['grid_table'].shape, data['data_image'].shape, data['ps_1d_indices'].shape)
-            
-            timer_start = timeit.default_timer()
-            [model_output_val] = sess.run(fetches=fetches, feed_dict=feed_dict)
-            timer_stop = timeit.default_timer()
-            print('\t >>time per step: %.2fs <<'%(timer_stop - timer_start))
+        fetches = [model_output]
+        
+        print(data['file_name'][0])
+        print(data['grid_table'].shape, data['data_image'].shape, data['ps_1d_indices'].shape)
+        
+        timer_start = timeit.default_timer()
+        [model_output_val] = sess.run(fetches=fetches, feed_dict=feed_dict)
+        timer_stop = timeit.default_timer()
+        print('\t >>time per step: %.2fs <<'%(timer_stop - timer_start))
 
 
-            # visualize result
-            shape = data['shape']
-            file_name = data['file_name'][0] # use one single file_name
-            bboxes = data['bboxes'][file_name]
-            if not params.is_table:
-                predictions = get_predicted_bboxes(data_loader, params.doc_path, np.array(data['grid_table'])[0], 
-                         np.array(data['gt_classes'])[0], np.array(model_output_val)[0], file_name, np.array(bboxes), shape)
-                results.append(predictions)
-                result_files.append(file_name)
-        return results, result_files
+        # visualize result
+        shape = data['shape']
+        file_name = data['file_name'][0] # use one single file_name
+        bboxes = data['bboxes'][file_name]
+        if not params.is_table:
+            predictions = get_predicted_bboxes(data_loader, params.doc_path, np.array(data['grid_table'])[0], 
+                     np.array(data['gt_classes'])[0], np.array(model_output_val)[0], file_name, np.array(bboxes), shape)
+            results.append(predictions)
+            result_files.append(file_name)
+    return results, result_files
 
 
 def get_predicted_bboxes(data_loader, file_prefix, grid_table, gt_classes, model_output_val, file_name,  bboxes, shape):
@@ -277,9 +311,10 @@ def sanitise_prediction(prediction: Prediction) -> Optional[Prediction]:
     
 
 if __name__ == "__main__":
-    doc_path = "inference_data/"
-    results, result_files = infer(doc_path)
+    #doc_path = "inference_data/"
+    doc_path = "inference_single_data/"
     inference_dict = {}
+    results, result_files = infer(doc_path)
     for ind, r in enumerate(results):       
         print("{} th result".format(ind))
         try:
@@ -290,6 +325,6 @@ if __name__ == "__main__":
             inference_dict[result_files[ind]] = results
         except Exception as e:
             print(e)
-    json.dump(inference_dict, open("inference_results.json", "w"), indent=4)
+    #json.dump(inference_dict, open("inference_results.json", "w"), indent=4)
 
     
