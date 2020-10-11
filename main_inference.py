@@ -100,6 +100,19 @@ def load_model(doc_path="inference_data"):
 network, model_output, sess = load_model()
 
 
+def convert_to_savedmodel(export_dir="graph/DENTAL_savedmodel", ckpt_path_prefix="graph/DENTAL/CUTIE_atrousSPP_d20000c6(r80c80)_iter_900.ckpt"):
+    graph = tf.Graph()
+    with tf.Session(graph=graph) as sess:
+        # Restore from checkpoint
+        saver = tf.train.import_meta_graph(ckpt_path_prefix + ".meta" )
+        saver.restore(sess, ckpt_path_prefix)
+
+        # Export checkpoint to SavedModel
+        builder = tf.saved_model.builder.SavedModelBuilder(export_dir)
+        builder.add_meta_graph_and_variables(sess, ['tfckpt2pb'], strip_default_attrs=False)
+        builder.save()
+
+
 def infer(doc_path, network=network, model_output=model_output, sess=sess) -> List[Prediction]:
     params = inference_input(doc_path)
 
@@ -311,20 +324,23 @@ def sanitise_prediction(prediction: Prediction) -> Optional[Prediction]:
     
 
 if __name__ == "__main__":
-    #doc_path = "inference_data/"
-    doc_path = "inference_single_data/"
-    inference_dict = {}
-    results, result_files = infer(doc_path)
-    for ind, r in enumerate(results):       
-        print("{} th result".format(ind))
-        try:
-            print("RESULTS for ", result_files[ind])
-            results = post_processing(r)
-            print("FINAL RESULTS for", result_files[ind])
-            print(json.dumps(results, indent=4))
-            inference_dict[result_files[ind]] = results
-        except Exception as e:
-            print(e)
-    #json.dump(inference_dict, open("inference_results.json", "w"), indent=4)
-
-    
+    if False:
+        #doc_path = "inference_data/"
+        doc_path = "inference_single_data/"
+        inference_dict = {}
+        results, result_files = infer(doc_path)
+        for ind, r in enumerate(results):       
+            print("{} th result".format(ind))
+            try:
+                print("RESULTS for ", result_files[ind])
+                results = post_processing(r)
+                print("FINAL RESULTS for", result_files[ind])
+                print(json.dumps(results, indent=4))
+                inference_dict[result_files[ind]] = results
+            except Exception as e:
+                print(e)
+        #json.dump(inference_dict, open("inference_results.json", "w"), indent=4)
+    if True:
+        export_dir = "graph/DENTAL_savedmodel"
+        ckpt_path_prefix = "graph/DENTAL/CUTIE_atrousSPP_d20000c6(r80c80)_iter_900.ckpt"
+        convert_to_savedmodel(export_dir=export_dir, ckpt_path_prefix=ckpt_path_prefix)
