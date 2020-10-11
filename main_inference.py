@@ -57,7 +57,7 @@ class Config:
         self.e_ckpt_path = "graph/"
         self.ckpt_file = "CUTIE_atrousSPP_d20000c6(r80c80)_iter_900.ckpt"
         self.load_dict_from_path = "dict/DENTAL"
-        self.savedmodel_dir = "graph/DENTAL_savedmodel"
+        self.savedmodel_dir = "graph/DENTAL_savedmodel/1"
 
 
 def inference_input(doc_path):
@@ -69,16 +69,16 @@ def inference_input(doc_path):
     return params
 
 
-def load_savedmodel(savedmodel_dir="graph/DENTAL_savedmodel"):
+def load_savedmodel(savedmodel_dir="graph/DENTAL_savedmodel/1"):
     config = tf.ConfigProto(allow_soft_placement=True)
     sess = tf.Session(config=config)
     sess.run(tf.global_variables_initializer())
     sess.graph.as_default()
-    tf.saved_model.load(sess, ["tfckpt2pb"], savedmodel_dir)
+    tf.saved_model.load(sess, ["serve"], savedmodel_dir)
     return sess
 
 
-def load_model(doc_path="inference_data"):
+def load_model(doc_path="inference_data", is_savedmodel=False):
     params = inference_input(doc_path)
 
     data_loader = DataLoader(params, params.classes, update_dict=False, load_dictionary=True, data_split=0.0) # False to provide a path with only test data
@@ -90,24 +90,23 @@ def load_model(doc_path="inference_data"):
     else:
         network = CUTIEv1(num_words, num_classes, params)
     model_output = network.get_output('softmax')
-
-    sess = load_savedmodel(params.savedmodel_dir)
     
-    '''
-    # evaluation
-    ckpt_saver = tf.train.Saver()
-    config = tf.ConfigProto(allow_soft_placement=True)
-    sess = tf.Session(config=config)
-    sess.run(tf.global_variables_initializer())
-    try:
-        ckpt_path = os.path.join(params.e_ckpt_path, params.save_prefix, params.ckpt_file)
-        ckpt = tf.train.get_checkpoint_state(ckpt_path)
-        print('Restoring from {}...'.format(ckpt_path))
-        ckpt_saver.restore(sess, ckpt_path)
-        print('{} restored'.format(ckpt_path))
-    except:
-        raise Exception('Check your pretrained {:s}'.format(ckpt_path))
-    '''
+    if is_savedmodel:
+        sess = load_savedmodel(params.savedmodel_dir)
+    else:
+        # evaluation
+        ckpt_saver = tf.train.Saver()
+        config = tf.ConfigProto(allow_soft_placement=True)
+        sess = tf.Session(config=config)
+        sess.run(tf.global_variables_initializer())
+        try:
+            ckpt_path = os.path.join(params.e_ckpt_path, params.save_prefix, params.ckpt_file)
+            ckpt = tf.train.get_checkpoint_state(ckpt_path)
+            print('Restoring from {}...'.format(ckpt_path))
+            ckpt_saver.restore(sess, ckpt_path)
+            print('{} restored'.format(ckpt_path))
+        except:
+            raise Exception('Check your pretrained {:s}'.format(ckpt_path))
 
     return network, model_output, sess
 
@@ -115,7 +114,7 @@ def load_model(doc_path="inference_data"):
 network, model_output, sess = load_model()
 
 
-def convert_to_savedmodel(export_dir="graph/DENTAL_savedmodel", ckpt_path_prefix="graph/DENTAL/CUTIE_atrousSPP_d20000c6(r80c80)_iter_900.ckpt"):
+def convert_to_savedmodel(export_dir="graph/DENTAL_savedmodel/1", ckpt_path_prefix="graph/DENTAL/CUTIE_atrousSPP_d20000c6(r80c80)_iter_900.ckpt"):
     graph = tf.Graph()
     with tf.Session(graph=graph) as sess:
         # Restore from checkpoint
@@ -124,7 +123,7 @@ def convert_to_savedmodel(export_dir="graph/DENTAL_savedmodel", ckpt_path_prefix
 
         # Export checkpoint to SavedModel
         builder = tf.saved_model.builder.SavedModelBuilder(export_dir)
-        builder.add_meta_graph_and_variables(sess, ['tfckpt2pb'], strip_default_attrs=False)
+        builder.add_meta_graph_and_variables(sess, ['serve'], strip_default_attrs=False)
         builder.save()
 
 
@@ -341,7 +340,7 @@ def sanitise_prediction(prediction: Prediction) -> Optional[Prediction]:
     
 
 if __name__ == "__main__":
-    if True:
+    if False:
         #doc_path = "inference_data/"
         doc_path = "inference_single_data/"
         inference_dict = {}
@@ -357,7 +356,7 @@ if __name__ == "__main__":
             except Exception as e:
                 print(e)
         #json.dump(inference_dict, open("inference_results.json", "w"), indent=4)
-    if False:
-        export_dir = "graph/DENTAL_savedmodel"
+    if True:
+        export_dir = "graph/DENTAL_savedmodel/1"
         ckpt_path_prefix = "graph/DENTAL/CUTIE_atrousSPP_d20000c6(r80c80)_iter_900.ckpt"
         convert_to_savedmodel(export_dir=export_dir, ckpt_path_prefix=ckpt_path_prefix)
