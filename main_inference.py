@@ -57,6 +57,7 @@ class Config:
         self.e_ckpt_path = "graph/"
         self.ckpt_file = "CUTIE_atrousSPP_d20000c6(r80c80)_iter_900.ckpt"
         self.load_dict_from_path = "dict/DENTAL"
+        self.savedmodel_dir = "graph/DENTAL_savedmodel"
 
 
 def inference_input(doc_path):
@@ -66,6 +67,15 @@ def inference_input(doc_path):
     
     params = argparse.Namespace(**args)
     return params
+
+
+def load_savedmodel(savedmodel_dir="graph/DENTAL_savedmodel"):
+    config = tf.ConfigProto(allow_soft_placement=True)
+    sess = tf.Session(config=config)
+    sess.run(tf.global_variables_initializer())
+    sess.graph.as_default()
+    tf.saved_model.load(sess, ["tfckpt2pb"], savedmodel_dir)
+    return sess
 
 
 def load_model(doc_path="inference_data"):
@@ -80,7 +90,10 @@ def load_model(doc_path="inference_data"):
     else:
         network = CUTIEv1(num_words, num_classes, params)
     model_output = network.get_output('softmax')
+
+    sess = load_savedmodel(params.savedmodel_dir)
     
+    '''
     # evaluation
     ckpt_saver = tf.train.Saver()
     config = tf.ConfigProto(allow_soft_placement=True)
@@ -94,6 +107,8 @@ def load_model(doc_path="inference_data"):
         print('{} restored'.format(ckpt_path))
     except:
         raise Exception('Check your pretrained {:s}'.format(ckpt_path))
+    '''
+
     return network, model_output, sess
 
 
@@ -111,6 +126,8 @@ def convert_to_savedmodel(export_dir="graph/DENTAL_savedmodel", ckpt_path_prefix
         builder = tf.saved_model.builder.SavedModelBuilder(export_dir)
         builder.add_meta_graph_and_variables(sess, ['tfckpt2pb'], strip_default_attrs=False)
         builder.save()
+
+
 
 
 def infer(doc_path, network=network, model_output=model_output, sess=sess) -> List[Prediction]:
@@ -324,7 +341,7 @@ def sanitise_prediction(prediction: Prediction) -> Optional[Prediction]:
     
 
 if __name__ == "__main__":
-    if False:
+    if True:
         #doc_path = "inference_data/"
         doc_path = "inference_single_data/"
         inference_dict = {}
@@ -340,7 +357,7 @@ if __name__ == "__main__":
             except Exception as e:
                 print(e)
         #json.dump(inference_dict, open("inference_results.json", "w"), indent=4)
-    if True:
+    if False:
         export_dir = "graph/DENTAL_savedmodel"
         ckpt_path_prefix = "graph/DENTAL/CUTIE_atrousSPP_d20000c6(r80c80)_iter_900.ckpt"
         convert_to_savedmodel(export_dir=export_dir, ckpt_path_prefix=ckpt_path_prefix)
