@@ -113,7 +113,8 @@ def label_gt(anno_bucket: str = transform_bucket, gt_bucket: str = landing_bucke
 
         print("key", auto_label_text_key_prefix.format(file_name.split('.')[0]))
         if anno_json['fields']:
-            write_json_to_s3(anno_json, transform_bucket, auto_label_text_key_prefix.format(file_name.split('.')[0]))
+            updated_anno_json = merge_label_fields(anno_json)
+            write_json_to_s3(updated_anno_json, transform_bucket, auto_label_text_key_prefix.format(file_name.split('.')[0]))
 
     return
 
@@ -167,3 +168,15 @@ def merge_label_fields(anno_json):
     return anno_json
         
 
+if __name__ == "__main__":
+    ### Transform textract results to training data format:
+    bucket = "nib-prod-analytics-privacy-landing-ap-southeast-2"
+    prefix = "claim-receipt-recognition/category_id_19"
+
+    keys = list_s3_keys(bucket, prefix)
+    file_ids = [f.rpartition('/')[-1] for f in keys]
+    annotate_data(file_ids)
+
+    ### Label ground truth data from the transformed textract results (above)
+    label_gt() 
+    
